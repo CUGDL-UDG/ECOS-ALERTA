@@ -1,1 +1,858 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECOS ALERTA - Prototipo Móvil</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de íconos Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Definición de la fuente Inter y estilos base */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d0d0d;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
 
+        /* Clase para el contenedor del teléfono móvil */
+        #mobile-frame {
+            position: relative;
+            width: 100%;
+            max-width: 400px; /* Tamaño máximo de un móvil */
+            height: 800px;
+            background-color: #000000;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px rgba(153, 51, 255, 0.5), 0 0 0 10px #1a1a1a;
+            overflow: hidden;
+            border: 8px solid #333;
+        }
+
+        /* Estilo para simular el borde de la pantalla */
+        #app-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-color: #000000;
+            color: #ffffff;
+            position: relative;
+        }
+
+        .view {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: none; /* Se oculta por defecto y se muestra con JS */
+            flex-direction: column;
+            padding: 0 20px 20px 20px; /* Padding ajustado para el nuevo header */
+        }
+        
+        .view.active {
+            display: flex;
+        }
+
+        /* Animación para el botón de alerta */
+        @keyframes pulse-ring {
+            0% {
+                box-shadow: 0 0 0 0px rgba(153, 51, 255, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 20px rgba(153, 51, 255, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(153, 51, 255, 0);
+            }
+        }
+
+        .alert-pulse {
+            animation: pulse-ring 1.5s infinite;
+        }
+        
+        /* Estilos específicos para el mapa */
+        #map-container {
+            position: relative;
+            cursor: grab;
+        }
+
+        /* Estilo para simular el arrastre del mapa */
+        .is-dragging {
+            cursor: grabbing;
+        }
+
+        /* Estilo para el input de rango (slider) */
+        .range-lg::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #9933FF;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 0 4px rgba(153, 51, 255, 0.3);
+        }
+    </style>
+    <script>
+        // Configuración de colores de Tailwind
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'eco-purple': '#9933FF',
+                        'eco-dark': '#000000',
+                        'eco-red': '#D92A41',
+                        'eco-blue': '#1a75ff',
+                        'eco-ia': '#5865F2', 
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+
+<div id="mobile-frame">
+    <div id="app-container">
+
+        <!-- 0. Barra de estado simulada -->
+        <div class="h-8 flex items-center justify-between px-4 bg-eco-dark text-white text-xs pt-2">
+            <span>11:14 AM</span>
+            <div class="flex items-center space-x-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12a5 5 0 0 1 10 0"/><path d="M12 21.5V18.5"/><path d="M12 5.5V2.5"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="12" x="3" y="6" rx="2"/><path d="M21 10v4"/></svg>
+            </div>
+        </div>
+
+        <!-- 1. Pantalla de Inicio / Login -->
+        <div id="view-login" class="view active justify-center items-center text-center p-8">
+            <div class="flex flex-col items-center">
+                <div class="text-6xl font-extrabold text-eco-purple mb-4">ECOS</div>
+                <div class="text-4xl font-light text-white mb-10">ALERTA</div>
+                <p class="text-sm text-gray-400 mb-16">Sistema de seguridad inteligente y comunitario.</p>
+            </div>
+
+            <div class="space-y-4 w-full">
+                <button onclick="changeView('view-dashboard')" class="w-full py-4 text-lg font-semibold bg-eco-purple text-white rounded-xl shadow-lg hover:opacity-90 transition duration-300">
+                    Iniciar Sesión
+                </button>
+                <button onclick="changeView('view-bracelet-linkage')" class="w-full py-4 text-lg font-semibold border-2 border-white text-white rounded-xl bg-transparent hover:border-eco-purple hover:text-eco-purple transition duration-300">
+                    Activar mi Pulsera
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Panel Principal / Dashboard -->
+        <div id="view-dashboard" class="view justify-center items-center text-center">
+             <!-- NUEVO ENCABEZADO: Solo Menú -->
+            <header class="w-full p-4 flex justify-end flex-shrink-0">
+                <button onclick="toggleSideMenu()" class="text-white hover:text-eco-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+                </button>
+            </header>
+            
+            <div class="flex flex-col items-center flex-grow justify-center pb-10">
+                <h1 class="text-xl font-light text-gray-300 mb-10">Tu seguridad está activada</h1>
+                
+                <!-- Botón Central ALERTA -->
+                <div id="alert-button-container" class="relative flex justify-center items-center mb-10">
+                    <button 
+                        id="alert-button"
+                        ontouchstart="startAlertTimer()" 
+                        ontouchend="clearAlertTimer()"
+                        onmousedown="startAlertTimer()" 
+                        onmouseup="clearAlertTimer()"
+                        class="w-64 h-64 rounded-full bg-eco-dark text-white border-8 border-eco-purple alert-pulse shadow-2xl transition duration-500 ease-in-out flex flex-col justify-center items-center hover:scale-[1.03]"
+                    >
+                        <!-- Icono de Escudo (Shield) -->
+                        <svg id="alert-icon" xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-2 text-eco-purple">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <path id="alert-check" d="m9 12 2 2 4-4" class="text-white fill-current stroke-eco-purple transition duration-500"/>
+                        </svg>
+                        <span id="alert-text" class="text-3xl font-bold">ALERTA</span>
+                    </button>
+                </div>
+                
+                <p id="alert-prompt" class="text-lg text-gray-400">Presiona y mantén 3 segundos para activar el auxilio automático.</p>
+                
+                <!-- Mensaje de estado (oculto por defecto) -->
+                <div id="status-message" class="mt-8 p-4 bg-eco-red/20 border-l-4 border-eco-red text-eco-red font-semibold rounded-lg hidden">
+                    <p>ALERTA ENVIADA – Autoridades y contactos notificados.</p>
+                    <p class="text-sm text-white/70">Coordenadas GPS enviadas.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Mapa en Tiempo Real (Interactive Google Maps Look) -->
+        <div id="view-map" class="view">
+            <!-- NUEVO ENCABEZADO: Botón de Volver y Menú -->
+            <header class="w-full flex justify-between items-center pt-4 pb-4 flex-shrink-0">
+                <button onclick="goBack()" class="text-white hover:text-eco-purple text-2xl font-bold p-1">
+                    &lt;
+                </button>
+                <h1 class="text-xl font-semibold">Mapa en Tiempo Real</h1>
+                <button onclick="toggleSideMenu()" class="text-white hover:text-eco-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+                </button>
+            </header>
+            
+            <!-- Contenedor del Mapa Simulado (Similar a Google Maps Dark Mode) -->
+            <div id="map-container" class="h-96 rounded-xl overflow-hidden relative shadow-lg mb-4 flex-shrink-0" style="background-color: #1a1a1a;">
+                <!-- Placeholder/Simulación de Mapa de Calles -->
+                <div id="map-content" class="absolute inset-0 transition-transform duration-100" style="transform: translate(0px, 0px);">
+                    <!-- Imagen de fondo que simula un mapa de calles (Google Maps Dark) -->
+                    <img 
+                        src="https://placehold.co/400x600/1E1E1E/CCCCCC?text=MAPA+DE+CALLES+EN+TIEMPO+REAL" 
+                        alt="Mapa de calles y avenidas" 
+                        class="w-full h-full object-cover" 
+                        onerror="this.style.display='none';"
+                        style="filter: grayscale(30%) brightness(80%);"
+                    >
+                    
+                    <!-- Marcador de Ubicación Actual -->
+                    <div class="absolute top-[60%] left-[50%] transform -translate-x-1/2 -translate-y-1/2 p-2 bg-white rounded-full shadow-xl z-10 animate-bounce">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="currentColor" class="text-eco-purple">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                        </svg>
+                    </div>
+                    
+                    <!-- Trayectoria simulada -->
+                    <div class="absolute top-[40%] left-[20%] w-2 h-2 bg-eco-red rounded-full"></div>
+                    <div class="absolute top-[50%] left-[35%] w-2 h-2 bg-eco-red rounded-full"></div>
+                </div>
+                <div class="absolute top-2 left-2 px-3 py-1 bg-eco-purple text-xs font-semibold rounded-lg z-20">EN VIVO</div>
+            </div>
+            
+            <h2 class="text-xl font-semibold mb-3 text-gray-300">Registro de Actividad (Últimos 15 min)</h2>
+            <div class="space-y-2 text-sm text-white/80 overflow-y-auto max-h-40 p-3 bg-[#111] rounded-xl border border-gray-800">
+                <p><span class="text-eco-purple font-mono">11:05 AM:</span> Velocidad promedio: 4.5 km/h. (Caminando)</p>
+                <p><span class="text-eco-purple font-mono">11:03 AM:</span> Geolocalización actualizada: Av. Reforma #101.</p>
+                <p><span class="text-eco-purple font-mono">10:55 AM:</span> Dispositivo ECOS detectado a 50m.</p>
+                <p><span class="text-eco-purple font-mono">10:50 AM:</span> Geolocalización actualizada: Cerca de Parque Central.</p>
+            </div>
+        </div>
+
+        <!-- 4. Notificaciones de Emergencia -->
+        <div id="view-notifications" class="view">
+            <!-- NUEVO ENCABEZADO: Botón de Volver y Menú -->
+            <header class="w-full flex justify-between items-center pt-4 pb-4 flex-shrink-0">
+                <button onclick="goBack()" class="text-white hover:text-eco-purple text-2xl font-bold p-1">
+                    &lt;
+                </button>
+                <h1 class="text-xl font-semibold">Alertas Recientes</h1>
+                <button onclick="toggleSideMenu()" class="text-white hover:text-eco-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+                </button>
+            </header>
+            <div class="space-y-3">
+                
+                <!-- Tarjeta de Alerta (Riesgo Alto) -->
+                <div class="p-4 bg-eco-red/20 rounded-xl border border-eco-red">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-lg text-eco-red flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M10.29 3.86 1.86 18c-1.28 2.2 1.57 4.96 3.84 3.4L10.29 3.86z"/><path d="m13.71 20.14 8.43-14.14c1.28-2.2-1.57-4.96-3.84-3.4L13.71 20.14z"/></svg>
+                            Alerta de Pánico - CERCANA
+                        </span>
+                        <span class="text-xs text-white/70">Hace 3 min</span>
+                    </div>
+                    <p class="text-sm text-white/80">C. del Álamo #145, a 300m de tu ubicación.</p>
+                    <p class="text-xs text-eco-red font-semibold mt-1">Nivel de Riesgo: ALTO</p>
+                </div>
+
+                <!-- Tarjeta de Alerta (Riesgo Medio) -->
+                <div class="p-4 bg-yellow-600/20 rounded-xl border border-yellow-600">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-lg text-yellow-500 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M14.5 10c-.8-4.5-4.7-6-9.5-6C4 4 2 5.5 2 7.5c0 2.5 4.5 5.2 6 6.5s2.5 2.5 2.5 4v1c0 1.5-1 2-2.5 2-.8 0-1.5-.5-1.5-1"/><path d="M13.5 10c.8 4.5 4.7 6 9.5 6 1.5 0 3-1.5 3-3.5 0-2.5-4.5-5.2-6-6.5S15 3.5 15 2v-1c0-1.5 1-2 2.5-2 .8 0 1.5.5 1.5 1"/></svg>
+                            Activación de Pulsera
+                        </span>
+                        <span class="text-xs text-white/70">Hace 1 día</span>
+                    </div>
+                    <p class="text-sm text-white/80">Av. Insurgentes Sur #1024. Reporte preventivo.</p>
+                    <p class="text-xs text-yellow-500 font-semibold mt-1">Nivel de Riesgo: BAJO</p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 5. Carpeta de Investigación Digital -->
+        <div id="view-investigation-folder" class="view">
+            <!-- NUEVO ENCABEZADO: Botón de Volver y Menú -->
+            <header class="w-full flex justify-between items-center pt-4 pb-4 flex-shrink-0">
+                <button onclick="goBack()" class="text-white hover:text-eco-purple text-2xl font-bold p-1">
+                    &lt;
+                </button>
+                <h1 class="text-xl font-semibold flex items-center">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-eco-blue"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M10 17h4"/><path d="M10 13h4"/></svg>
+                     Carpeta Digital
+                </h1>
+                <button onclick="toggleSideMenu()" class="text-white hover:text-eco-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+                </button>
+            </header>
+
+            <p class="text-gray-400 mb-6 flex-shrink-0">Gestiona tus expedientes vinculados con la Fiscalía.</p>
+
+            <!-- Historial (Movido aquí) -->
+            <h2 class="text-xl font-semibold mb-4 text-gray-300">Registro de Incidentes</h2>
+            <div class="space-y-3 mb-6 flex-shrink-0">
+                <div class="p-4 bg-[#111] rounded-xl">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-sm text-gray-400">2025-10-18 | 09:30 AM</span>
+                        <span class="px-3 py-1 text-xs font-bold rounded-full bg-green-500/20 text-green-400">ATENDIDO</span>
+                    </div>
+                    <p class="text-white font-medium">Alerta Manual (Pulsera) - Próx. a Mercado Central</p>
+                    <p class="text-xs text-gray-500 mt-1">ID Caso: #CDMX-00345/2025</p>
+                </div>
+            </div>
+
+            <h2 class="text-xl font-semibold mb-4">Mis Expedientes Digitales</h2>
+            <div class="space-y-3">
+                
+                <!-- Carpeta Activa 1 -->
+                <div class="p-4 bg-[#111] rounded-xl border border-eco-blue">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-lg text-eco-blue">#CDMX-00345/2025</span>
+                        <span class="px-3 py-1 text-xs font-bold rounded-full bg-eco-blue/20 text-eco-blue">EN PROCESO</span>
+                    </div>
+                    <p class="text-sm text-gray-400">Delito: Violencia de Género. Fecha Alerta: 10/10/2025</p>
+                    <button class="text-xs text-eco-purple hover:text-white mt-2 font-medium">Ver Pruebas Adjuntas (GPS, Testigos)</button>
+                </div>
+
+            </div>
+
+            <!-- Acción de Seguimiento -->
+            <div class="mt-8 flex-shrink-0">
+                <button class="w-full py-3 text-lg flex items-center justify-center bg-eco-purple text-white rounded-xl shadow-lg hover:opacity-90 transition duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                    Consultar Estatus Oficial
+                </button>
+            </div>
+        </div>
+
+        <!-- 6. Asistencia IA para 911 (VISTA DE CHAT - Sin menú ni back) -->
+        <div id="view-ai-chat" class="view justify-end">
+            <h1 class="text-xl font-bold text-eco-red mb-4 text-center flex-shrink-0">¡ALERTA ACTIVADA! Asistencia Inmediata IA</h1>
+            <div class="flex-grow overflow-y-auto space-y-4 pt-4">
+                
+                <!-- Mensaje de IA Inicial -->
+                <div class="flex justify-start">
+                    <div class="bg-eco-ia p-3 rounded-xl rounded-bl-none max-w-[80%] shadow-lg">
+                        <span class="text-xs text-white/70 block mb-1 font-bold">ECOS IA - Asistencia 911</span>
+                        <p class="text-sm text-white">Hemos notificado al 911 y a tu red. Para ayudar al operador, por favor, responde: **¿Estás en un lugar conocido o en movimiento?**</p>
+                    </div>
+                </div>
+
+                <!-- Respuesta del Usuario Simulada -->
+                <div class="flex justify-end">
+                    <div class="bg-gray-700 p-3 rounded-xl rounded-br-none max-w-[80%] shadow-lg">
+                        <p class="text-sm text-white">Estoy caminando por la calle, cerca de un parque grande.</p>
+                    </div>
+                </div>
+
+                <!-- Respuesta de IA 2 -->
+                <div class="flex justify-start">
+                    <div class="bg-eco-ia p-3 rounded-xl rounded-bl-none max-w-[80%] shadow-lg">
+                        <span class="text-xs text-white/70 block mb-1 font-bold">ECOS IA - Asistencia 911</span>
+                        <p class="text-sm text-white">Gracias. La ubicación GPS es **Av. del Sol, #456**. Le dirás al operador: **"Estoy en peligro, necesito ayuda en Av. del Sol #456, estoy cerca de un parque. Visto chamarra azul."**</p>
+                    </div>
+                </div>
+
+                <!-- Mensaje de Guía -->
+                <div class="flex justify-start">
+                    <div class="bg-yellow-600/30 border border-yellow-500 p-3 rounded-xl max-w-[90%] shadow-lg">
+                        <p class="text-xs text-yellow-400 font-bold">RECUERDA: Mantén la calma. El operador ya tiene tus coordenadas.</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Área de Ingreso de Texto -->
+            <div class="mt-4 flex space-x-2 flex-shrink-0">
+                <input type="text" placeholder="Escribe al asistente de IA..." class="flex-grow p-3 bg-gray-800 rounded-xl text-white placeholder-gray-500 border border-gray-700 focus:border-eco-ia focus:ring-1 focus:ring-eco-ia outline-none">
+                <button class="p-3 bg-eco-ia text-white rounded-xl hover:bg-eco-blue transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- 7. Vinculación de Pulsera ECOS -->
+        <div id="view-bracelet-linkage" class="view justify-center items-center text-center">
+            <!-- NUEVO ENCABEZADO: Botón de Volver y Menú -->
+            <header class="w-full flex justify-between items-center pt-4 pb-8 flex-shrink-0">
+                <button onclick="goBack()" class="text-white hover:text-eco-purple text-2xl font-bold p-1">
+                    &lt;
+                </button>
+                <h1 class="text-xl font-semibold">Vincular Pulsera</h1>
+                <button onclick="toggleSideMenu()" class="text-white hover:text-eco-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+                </button>
+            </header>
+
+            <div class="flex flex-col items-center flex-grow justify-center pb-10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-eco-purple mb-6"><rect width="18" height="12" x="3" y="8" rx="2"/><path d="M12 22V8"/><path d="M17 22V8"/><path d="M7 22V8"/><path d="M12 2h5a2 2 0 0 1 2 2v4"/><path d="M12 2h-5a2 2 0 0 0-2 2v4"/><path d="M12 18V8"/></svg>
+                <h1 class="text-3xl font-bold mb-4">Activar Pulsera ECOS</h1>
+                <p class="text-gray-400 mb-10">Activa tu dispositivo de seguridad inteligente.</p>
+
+                <div class="w-full space-y-4">
+                    <button id="scan-button" onclick="startScanning()" class="w-full py-4 text-lg font-semibold bg-eco-purple text-white rounded-xl shadow-lg hover:opacity-90 transition duration-300 flex items-center justify-center">
+                        <svg id="scan-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        <span id="scan-text">Buscar Dispositivo Bluetooth...</span>
+                    </button>
+                    
+                    <p id="scan-status" class="text-sm text-gray-500 mt-4 h-6">Asegúrate de que la pulsera esté cargada y cerca.</p>
+                </div>
+
+                <div id="device-list" class="w-full mt-8 space-y-3 hidden">
+                    <h2 class="text-lg font-semibold text-left text-gray-300">Dispositivos Encontrados:</h2>
+                    <!-- Dispositivo 1 -->
+                    <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg border border-gray-700">
+                        <span>Pulsera ECOS P-8002</span>
+                        <button onclick="linkDevice('P-8002')" class="text-sm px-4 py-1 bg-eco-blue text-white rounded-lg hover:bg-eco-ia">Vincular</button>
+                    </div>
+                    <!-- Dispositivo 2 (Simulado) -->
+                    <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg border border-gray-700">
+                        <span>Pulsera ECOS P-9105</span>
+                        <button onclick="linkDevice('P-9105')" class="text-sm px-4 py-1 bg-eco-blue text-white rounded-lg hover:bg-eco-ia">Vincular</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. Perfil de Usuaria -->
+        <div id="view-profile" class="view items-center">
+            <!-- NUEVO ENCABEZADO: Botón de Volver y Menú -->
+            <header class="w-full flex justify-between items-center pt-4 pb-4 flex-shrink-0">
+                <button onclick="goBack()" class="text-white hover:text-eco-purple text-2xl font-bold p-1">
+                    &lt;
+                </button>
+                <h1 class="text-xl font-semibold">Mi Perfil ECOS</h1>
+                <button onclick="toggleSideMenu()" class="text-white hover:text-eco-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+                </button>
+            </header>
+            
+            <div class="w-24 h-24 bg-eco-purple rounded-full flex items-center justify-center mb-4 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <p class="text-2xl font-bold text-white mb-2 flex-shrink-0">Andrea G. Ramos</p>
+            <p class="text-sm text-gray-400 mb-12 flex-shrink-0">andrea.r@email.com | ID: ECOS-A8392</p>
+
+            <div class="w-full p-6 bg-eco-purple/20 rounded-xl border border-eco-purple mb-8 flex-shrink-0">
+                <h2 class="text-xl font-bold mb-3 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M22 16.92v3a2 2 0 0 1-2 2h-4.84a2 2 0 0 1-1.28-.48L4.3 14.77a2 2 0 0 1 0-2.83l1.15-1.15a2 2 0 0 1 2.83 0L19.52 17.5a2 2 0 0 1 .48 1.28z"/></svg>
+                    Contacto de Emergencia
+                </h2>
+                <p class="text-lg font-semibold">Fernando G. Ramos (Padre)</p>
+                <p class="text-xl font-bold text-eco-purple mb-3">55-8822-1100</p>
+                <button class="w-full py-2 bg-eco-purple text-white rounded-lg hover:opacity-90">Llamar Ahora</button>
+            </div>
+
+            <button class="text-gray-400 hover:text-white transition flex-shrink-0">Editar Datos Básicos</button>
+        </div>
+
+        <!-- 9. Configuración -->
+        <div id="view-settings" class="view">
+            <!-- NUEVO ENCABEZADO: Botón de Volver y Menú -->
+            <header class="w-full flex justify-between items-center pt-4 pb-4 flex-shrink-0">
+                <button onclick="goBack()" class="text-white hover:text-eco-purple text-2xl font-bold p-1">
+                    &lt;
+                </button>
+                <h1 class="text-xl font-semibold">Configuración ECOS</h1>
+                <button onclick="toggleSideMenu()" class="text-white hover:text-eco-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+                </button>
+            </header>
+            
+            <div class="space-y-6">
+                
+                <!-- Conexión Pulsera (Link a la nueva vista) -->
+                <div class="p-4 bg-[#111] rounded-xl flex justify-between items-center">
+                    <div>
+                        <p class="font-bold text-lg">Pulsera ECOS ALERTA</p>
+                        <p class="text-sm text-gray-400">Estado: <span class="text-eco-purple font-semibold">Conectada</span> | Batería: 85%</p>
+                    </div>
+                    <button onclick="changeView('view-bracelet-linkage')" class="px-3 py-1 bg-eco-blue text-white rounded-lg text-sm hover:opacity-90">
+                        Vincular/Reconectar
+                    </button>
+                </div>
+
+                <!-- Rango de Alerta -->
+                <div class="p-4 bg-[#111] rounded-xl">
+                    <p class="font-bold text-lg mb-2">Radio de Alcance Comunitario</p>
+                    <p class="text-sm text-eco-purple font-semibold mb-3" id="range-value">100 Metros</p>
+                    <!-- Slider Simulado -->
+                    <input type="range" min="50" max="500" value="100" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-lg" oninput="document.getElementById('range-value').innerText = this.value + ' Metros'">
+                </div>
+                
+                <!-- Número de Emergencia -->
+                <div class="p-4 bg-[#111] rounded-xl">
+                    <p class="font-bold text-lg mb-1">Número de Emergencia</p>
+                    <p class="text-3xl font-extrabold text-eco-red">911</p>
+                    <p class="text-xs text-gray-400 mt-1">Vinculación directa al sistema de seguridad nacional.</p>
+                </div>
+                
+                <div class="text-center mt-8">
+                    <button onclick="changeViewAndClose('view-login')" class="text-gray-500 hover:text-eco-red">Cerrar Sesión</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BARRA DE NAVEGACIÓN INFERIOR (Visible en todas las vistas excepto Login) -->
+        <nav id="navbar" class="h-16 bg-eco-dark border-t border-gray-800 flex justify-around items-center px-4 flex-shrink-0 hidden">
+            <!-- 1. Alerta (Dashboard) -->
+            <button onclick="changeView('view-dashboard')" class="nav-item text-white flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span class="text-xs">Alerta</span>
+            </button>
+            <!-- 2. Mapa -->
+            <button onclick="changeView('view-map')" class="nav-item text-gray-500 hover:text-white flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18s-4-2-7-4V5l7-3 7 3v9c-3 2-7 4-7 4z"/></svg>
+                <span class="text-xs">Mapa</span>
+            </button>
+            <!-- 3. Alertas -->
+            <button onclick="changeView('view-notifications')" class="nav-item text-gray-500 hover:text-white flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <span class="text-xs">Alertas</span>
+            </button>
+            <!-- 4. Carpeta de Investigación -->
+            <button onclick="changeView('view-investigation-folder')" class="nav-item text-gray-500 hover:text-white flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <span class="text-xs">Carpeta</span>
+            </button>
+            <!-- 5. Perfil -->
+            <button onclick="changeView('view-profile')" class="nav-item text-gray-500 hover:text-white flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span class="text-xs">Perfil</span>
+            </button>
+        </nav>
+
+        <!-- Slogan ECOS ALERTA en el pie de página (fuera de la barra de navegación) -->
+        <div class="absolute bottom-0 left-0 right-0 text-center py-1 text-xs text-gray-600 bg-eco-dark flex-shrink-0">
+            ECOS ALERTA – Seguridad en tu pulso
+        </div>
+
+        <!-- 10. Menú Lateral Desplegable (Side Menu) -->
+        <div id="side-menu" class="fixed inset-0 z-40 bg-black/70 hidden transition-all duration-300" onclick="toggleSideMenu()">
+            <!-- Contenido del Menú -->
+            <div class="absolute right-0 top-0 h-full w-64 bg-[#111] p-6 shadow-xl" onclick="event.stopPropagation()">
+                <!-- Header del Menú -->
+                <div class="flex justify-between items-center mb-10 border-b border-gray-700 pb-3">
+                    <span class="text-xl font-bold text-eco-purple">Menú ECOS</span>
+                    <button onclick="toggleSideMenu()" class="text-white hover:text-eco-purple">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                </div>
+                <!-- Items del Menú -->
+                <div class="space-y-2">
+                    <button onclick="changeViewAndClose('view-dashboard')" class="w-full text-left py-3 px-4 rounded-xl text-lg text-white hover:bg-gray-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3 text-eco-purple"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span class="font-semibold">Dashboard</span>
+                    </button>
+                    <button onclick="changeViewAndClose('view-map')" class="w-full text-left py-3 px-4 rounded-xl text-lg text-white hover:bg-gray-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M12 18s-4-2-7-4V5l7-3 7 3v9c-3 2-7 4-7 4z"/></svg>
+                        <span class="font-semibold">Mapa en Vivo</span>
+                    </button>
+                    <button onclick="changeViewAndClose('view-notifications')" class="w-full text-left py-3 px-4 rounded-xl text-lg text-white hover:bg-gray-800 flex items-center">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        <span class="font-semibold">Alertas Comunitarias</span>
+                    </button>
+                    <button onclick="changeViewAndClose('view-investigation-folder')" class="w-full text-left py-3 px-4 rounded-xl text-lg text-white hover:bg-gray-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span class="font-semibold">Carpeta Digital</span>
+                    </button>
+                    <hr class="border-gray-700 my-4">
+                    <button onclick="changeViewAndClose('view-profile')" class="w-full text-left py-3 px-4 rounded-xl text-lg text-white hover:bg-gray-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span class="font-semibold">Mi Perfil</span>
+                    </button>
+                    <button onclick="changeViewAndClose('view-settings')" class="w-full text-left py-3 px-4 rounded-xl text-lg text-white hover:bg-gray-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.75 1.3a2 2 0 0 0 .24 2.75l.4.24a2 2 0 0 1 .9 1.73v.55a2 2 0 0 1-.9 1.73l-.4.24a2 2 0 0 0-.24 2.75l.75 1.3a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.75-1.3a2 2 0 0 0-.24-2.75l-.4-.24a2 2 0 0 1-.9-1.73v-.55a2 2 0 0 1 .9-1.73l.4-.24a2 2 0 0 0 .24-2.75l-.75-1.3a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <span class="font-semibold">Configuración</span>
+                    </button>
+                    <hr class="border-gray-700 my-4">
+                    <button onclick="changeViewAndClose('view-login')" class="w-full text-left py-3 px-4 rounded-xl text-lg text-eco-red hover:bg-gray-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                        <span class="font-semibold">Cerrar Sesión</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    let alertTimer = null;
+    const PRESS_DURATION = 3000; // 3 segundos
+    
+    // Variables para el historial de vistas y navegación
+    let viewHistory = [];
+    let currentViewId = 'view-login'; 
+    let isSideMenuOpen = false;
+
+    // Variables para la simulación de arrastre del mapa
+    let isDragging = false;
+    let startX, startY, currentTranslateX = 0, currentTranslateY = 0;
+    
+    // Función de modal customizada para reemplazar alert()
+    function alert(title, message) {
+        const frame = document.getElementById('mobile-frame');
+        
+        // Eliminar modales existentes para evitar duplicados
+        if (document.getElementById('custom-modal')) {
+            document.getElementById('custom-modal').remove();
+        }
+
+        const modalHtml = `
+            <div id="custom-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div class="bg-[#1a1a1a] p-6 rounded-xl shadow-2xl w-full max-w-sm border border-eco-purple">
+                    <h3 class="text-xl font-bold mb-3 text-white">${title}</h3>
+                    <p class="text-gray-300 mb-6">${message}</p>
+                    <button onclick="document.getElementById('custom-modal').remove()" class="w-full py-2 bg-eco-purple text-white rounded-lg hover:opacity-90">Entendido</button>
+                </div>
+            </div>
+        `;
+        frame.insertAdjacentHTML('afterbegin', modalHtml);
+    }
+    
+    // Función para alternar el menú lateral
+    function toggleSideMenu() {
+        const sideMenu = document.getElementById('side-menu');
+        isSideMenuOpen = !isSideMenuOpen;
+        if (isSideMenuOpen) {
+            sideMenu.classList.remove('hidden');
+        } else {
+            sideMenu.classList.add('hidden');
+        }
+    }
+    
+    // Función para cambiar de vista y cerrar el menú si está abierto
+    function changeViewAndClose(viewId) {
+        changeView(viewId);
+        if (isSideMenuOpen) {
+            toggleSideMenu();
+        }
+    }
+
+    // Función principal para cambiar de vista, gestionando el historial
+    function changeView(viewId, isBack = false) {
+        document.querySelectorAll('.view').forEach(view => {
+            view.classList.remove('active');
+            view.style.display = 'none';
+        });
+
+        // 1. Gestionar Historial (solo si no es un movimiento de "volver" y no es la vista actual)
+        // No almacenamos el login ni la pantalla de AI chat
+        if (viewId !== currentViewId && !isBack && currentViewId !== 'view-login' && currentViewId !== 'view-ai-chat') {
+            viewHistory.push(currentViewId);
+        }
+        
+        currentViewId = viewId;
+
+        // 2. Mostrar la nueva vista
+        document.getElementById(viewId).classList.add('active');
+        document.getElementById(viewId).style.display = 'flex';
+        
+        // 3. Mostrar/Ocultar barra de navegación y actualizar estado
+        const navbar = document.getElementById('navbar');
+        if (viewId === 'view-login' || viewId === 'view-ai-chat') {
+            navbar.classList.add('hidden');
+        } else {
+            navbar.classList.remove('hidden');
+            updateNavBar(viewId);
+        }
+    }
+
+    // Función para retroceder en el historial
+    function goBack() {
+        if (viewHistory.length > 0) {
+            const prevViewId = viewHistory.pop();
+            changeView(prevViewId, true);
+        } else {
+            // Si el historial está vacío, vamos al Dashboard por defecto (si no estamos ya en login)
+            if (currentViewId !== 'view-login') {
+                changeView('view-dashboard', true);
+            }
+        }
+    }
+
+    // Función para actualizar el estado de la barra de navegación
+    function updateNavBar(activeId) {
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('text-eco-purple');
+            item.classList.add('text-gray-500');
+        });
+        
+        const activeItem = document.querySelector(`#navbar button[onclick="changeView('${activeId}')"]`);
+        if (activeItem) {
+            activeItem.classList.remove('text-gray-500');
+            activeItem.classList.add('text-eco-purple');
+        }
+    }
+    
+    // Función para simular la activación de alerta
+    function activateAlert() {
+        const button = document.getElementById('alert-button');
+        const icon = document.getElementById('alert-icon');
+        const text = document.getElementById('alert-text');
+        
+        // 1. Cambios visuales de ALERTA (Rojo)
+        button.classList.remove('alert-pulse', 'border-eco-purple');
+        button.classList.add('bg-eco-red', 'border-eco-red');
+        icon.classList.remove('text-eco-purple');
+        icon.classList.add('text-white');
+        document.getElementById('alert-check').classList.remove('stroke-eco-purple');
+        document.getElementById('alert-check').classList.add('stroke-eco-red'); 
+        text.innerText = "ALERTA ACTIVA";
+
+        // 2. Transición a la vista de Asistencia IA
+        setTimeout(() => {
+            changeView('view-ai-chat');
+        }, 500); // Pequeña pausa para ver el estado rojo
+    }
+
+    // Lógica para iniciar el temporizador de presión
+    function startAlertTimer() {
+        const button = document.getElementById('alert-button');
+        button.classList.add('bg-gray-800'); // Indicador de que se está presionando
+        
+        // Reiniciar el estado visual del botón si se presiona después de una alerta
+        button.classList.remove('bg-eco-red', 'border-eco-red');
+        document.getElementById('alert-text').innerText = "ALERTA";
+
+        alertTimer = setTimeout(activateAlert, PRESS_DURATION);
+    }
+    
+    // Lógica para limpiar el temporizador al soltar
+    function clearAlertTimer() {
+        const button = document.getElementById('alert-button');
+        button.classList.remove('bg-gray-800');
+        
+        // Si se suelta antes de los 3 segundos, se cancela la alerta
+        if (alertTimer) {
+            clearTimeout(alertTimer);
+            // El estado visual vuelve a la normalidad si no se activó la alerta
+            document.getElementById('alert-text').innerText = "ALERTA";
+            if (!button.classList.contains('bg-eco-red')) {
+                button.classList.add('alert-pulse', 'border-eco-purple');
+                button.classList.remove('bg-gray-800');
+            }
+        }
+    }
+
+    // --- Lógica de Vinculación de Pulsera ---
+    function startScanning() {
+        const scanButton = document.getElementById('scan-button');
+        const scanText = document.getElementById('scan-text');
+        const scanStatus = document.getElementById('scan-status');
+        const deviceList = document.getElementById('device-list');
+        const scanIcon = document.getElementById('scan-icon');
+
+        scanText.innerText = 'Escaneando... (3s)';
+        scanStatus.innerText = 'Buscando dispositivos cercanos...';
+        scanButton.disabled = true;
+        deviceList.classList.add('hidden');
+        scanIcon.classList.add('animate-pulse');
+
+        setTimeout(() => {
+            scanText.innerText = 'Búsqueda Completa';
+            scanStatus.innerText = 'Selecciona tu pulsera de la lista.';
+            scanIcon.classList.remove('animate-pulse');
+            scanButton.disabled = false;
+            deviceList.classList.remove('hidden');
+        }, 3000);
+    }
+    
+    function linkDevice(deviceId) {
+        const scanStatus = document.getElementById('scan-status');
+        scanStatus.innerText = `Vinculando ${deviceId}...`;
+
+        setTimeout(() => {
+            // Mostrar un mensaje de éxito simulado
+            alert('Enlace Exitoso', `La pulsera ${deviceId} se ha vinculado correctamente. ¡Tu seguridad está activa!`);
+            // Redirigir al dashboard después del éxito
+            changeView('view-dashboard');
+        }, 1500);
+    }
+
+    // --- Lógica de Interactividad del Mapa (Pannning) ---
+    const mapContainer = document.getElementById('map-container');
+    const mapContent = document.getElementById('map-content');
+
+    // Función para obtener coordenadas (soporte para touch y mouse)
+    const getCoords = (e) => {
+        if (e.touches && e.touches.length) {
+            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+        return { x: e.clientX, y: e.clientY };
+    };
+
+    const startDrag = (e) => {
+        // Solo permitir arrastre si no estamos en la vista de IA o el menú está abierto
+        if (isSideMenuOpen) return;
+
+        isDragging = true;
+        mapContainer.classList.add('is-dragging');
+        const coords = getCoords(e);
+        // Desestructuración defensiva
+        const currentTransformMatch = mapContent.style.transform.match(/translate\(([^,]+)px, ([^)]+)px\)/);
+        if (currentTransformMatch) {
+            currentTranslateX = parseFloat(currentTransformMatch[1]);
+            currentTranslateY = parseFloat(currentTransformMatch[2]);
+        } else {
+             currentTranslateX = 0;
+             currentTranslateY = 0;
+        }
+
+        startX = coords.x - currentTranslateX;
+        startY = coords.y - currentTranslateY;
+        e.preventDefault();
+    };
+
+    const onDrag = (e) => {
+        if (!isDragging) return;
+        const coords = getCoords(e);
+        currentTranslateX = coords.x - startX;
+        currentTranslateY = coords.y - startY;
+
+        // Limitar el arrastre para que el mapa no se salga demasiado de la vista
+        const maxDrag = 50; 
+        currentTranslateX = Math.min(Math.max(currentTranslateX, -maxDrag), maxDrag);
+        currentTranslateY = Math.min(Math.max(currentTranslateY, -maxDrag), maxDrag);
+
+        mapContent.style.transform = `translate(${currentTranslateX}px, ${currentTranslateY}px)`;
+    };
+
+    const endDrag = () => {
+        isDragging = false;
+        mapContainer.classList.remove('is-dragging');
+    };
+
+    // Asignación de Event Listeners para Mouse y Touch
+    if (mapContainer) {
+        mapContainer.addEventListener('mousedown', startDrag);
+        mapContainer.addEventListener('touchstart', startDrag);
+        
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('touchmove', onDrag);
+        
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+    }
+
+
+    // Inicializar vista en el inicio de sesión
+    document.addEventListener('DOMContentLoaded', () => {
+        changeView('view-login');
+    });
+
+</script>
+
+</body>
+</html>
